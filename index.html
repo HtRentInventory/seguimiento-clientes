@@ -17,13 +17,13 @@
 const { useState, useMemo, useEffect } = React;
 
 /* ============================================================
-   CONFIGURA AQUÍ TU BACKEND (Google Sheets)
+   CONFIGURA EL BACKEND  —  INSTALACIÓN DE BETHY (uso exclusivo de ella)
    1) Pega la URL que termina en /exec de tu Apps Script en API_URL
    2) Pon EXACTAMENTE el mismo token en API_TOKEN
    Si las dejas vacías, la app funciona en modo local (sin nube).
    ============================================================ */
-const API_URL = "https://script.google.com/macros/s/AKfycbz1CjJ490NG1gmX2FpJ05JSF_PUAxg4sB-TIz99RujPYDzROMwb7X1bflayTHHp4mIk/exec";
-const API_TOKEN = "SEGUIMIENTO_A_CLIENTES_HT_JJ";
+const API_URL = "https://script.google.com/macros/s/AKfycbypoSMCRnhBgkQP6mC9HjMPylOandFgbAOGidpdeOMZPmgN0RYaEQTqzgFc8oQukRKh/exec";
+const API_TOKEN = "BETHY-2026";
 const CLOUD = API_URL.length > 10;
 async function apiList(){const r=await fetch(`${API_URL}?action=list&token=${encodeURIComponent(API_TOKEN)}`);const j=await r.json();if(!j.ok)throw new Error(j.error||"error");return j.data||[];}
 async function apiSave(rec){const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({token:API_TOKEN,action:"save",record:rec})});const j=await r.json();if(!j.ok)throw new Error(j.error||"error");return j;}
@@ -461,3 +461,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
+
