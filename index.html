@@ -16,6 +16,19 @@
 <script type="text/babel">
 const { useState, useMemo, useEffect } = React;
 
+/* ============================================================
+   CONFIGURA AQUÍ TU BACKEND (Google Sheets)
+   1) Pega la URL que termina en /exec de tu Apps Script en API_URL
+   2) Pon EXACTAMENTE el mismo token en API_TOKEN
+   Si las dejas vacías, la app funciona en modo local (sin nube).
+   ============================================================ */
+const API_URL = "https://script.google.com/macros/s/AKfycbz1CjJ490NG1gmX2FpJ05JSF_PUAxg4sB-TIz99RujPYDzROMwb7X1bflayTHHp4mIk/exec";
+const API_TOKEN = "SEGUIMIENTO_A_CLIENTES_HT_JJ";
+const CLOUD = API_URL.length > 10;
+async function apiList(){const r=await fetch(`${API_URL}?action=list&token=${encodeURIComponent(API_TOKEN)}`);const j=await r.json();if(!j.ok)throw new Error(j.error||"error");return j.data||[];}
+async function apiSave(rec){const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({token:API_TOKEN,action:"save",record:rec})});const j=await r.json();if(!j.ok)throw new Error(j.error||"error");return j;}
+async function apiBulk(recs){const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({token:API_TOKEN,action:"bulk",records:recs})});const j=await r.json();if(!j.ok)throw new Error(j.error||"error");return j;}
+
 /* ---------- Catálogos ---------- */
 const EJEC_DEF=["Sara Alonso","Aracely de Ochoa","Omar Guevara","Mary Morales"];
 const CLI_DEF={"Sara Alonso":[],"Aracely de Ochoa":[],"Omar Guevara":[],"Mary Morales":[]};
@@ -166,7 +179,7 @@ function construirLibro(registros){const wb=XLSX.utils.book_new();const de=detal
 
 function App(){
   const [now,setNow]=useState(Date.now());
-  const [registros,setRegistros]=useState(()=>demo(Date.now()));
+  const [registros,setRegistros]=useState(()=>CLOUD?[]:demo(Date.now()));
   const [vista,setVista]=useState("clientes");
   const [dia,setDia]=useState(HOY);
   const [fEjec,setFEjec]=useState("Todos");
@@ -176,8 +189,11 @@ function App(){
   const [editando,setEditando]=useState(null);
   const [aviso,setAviso]=useState(null);
   const [sheetUrl,setSheetUrl]=useState("");
+  const [cargando,setCargando]=useState(CLOUD);
+  const [sync,setSync]=useState("");
 
   useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),30000);return()=>clearInterval(t);},[]);
+  useEffect(()=>{if(!CLOUD)return;setCargando(true);apiList().then(d=>{setRegistros(d);setCargando(false);}).catch(err=>{setCargando(false);setAviso({tipo:"error",texto:"No se pudo cargar de la nube: "+err.message});});},[]);
 
   const ejecutivos=useMemo(()=>{const s=[...new Set(registros.map(r=>r.ejecutivo).filter(Boolean))].sort();return s.length?s:EJEC_DEF;},[registros]);
   const cliPorEjec=useMemo(()=>{const m={};registros.forEach(r=>{if(!r.ejecutivo)return;(m[r.ejecutivo]=m[r.ejecutivo]||new Set()).add(r.cliente);});const o={};Object.keys(m).forEach(k=>o[k]=[...m[k]].filter(Boolean).sort());return Object.keys(o).length?o:CLI_DEF;},[registros]);
@@ -196,9 +212,11 @@ function App(){
   const expIncompletos=visibles.filter(r=>!CERRADOS.includes(r.estatus)&&!reqStats(r).completo).length;
   const entregas7=visibles.filter(r=>r.entregaProgramada&&r.entregaProgramada>=HOY&&r.entregaProgramada<=addDays(HOY,7)).length;
 
-  const guardar=reg=>{setRegistros(prev=>reg.id?prev.map(r=>r.id===reg.id?reg:r):[...prev,{...reg,id:Math.max(0,...prev.map(x=>x.id))+1}]);setEditando(null);};
-  const marcarLlamada=id=>setRegistros(prev=>prev.map(r=>r.id===id?{...r,compromisoCumplido:true}:r));
+  const guardar=reg=>{const id=reg.id||(Math.max(0,...registros.map(x=>x.id))+1);const saved={...reg,id};setRegistros(prev=>prev.some(r=>r.id===id)?prev.map(r=>r.id===id?saved:r):[...prev,saved]);setEditando(null);if(CLOUD){setSync("Guardando…");apiSave(saved).then(()=>setSync("Guardado en la nube ✓")).catch(()=>setSync("⚠ Error al guardar en la nube"));}};
+  const marcarLlamada=id=>{setRegistros(prev=>prev.map(r=>r.id===id?{...r,compromisoCumplido:true}:r));if(CLOUD){const rec=registros.find(r=>r.id===id);if(rec)apiSave({...rec,compromisoCumplido:true}).catch(()=>{});}};
   const cambiarEjec=v=>{setFEjec(v);setFCli("Todos");};
+  function recargar(){setSync("Cargando…");apiList().then(d=>{setRegistros(d);setSync("Actualizado ✓");}).catch(e=>setSync("Error: "+e.message));}
+  function subirTodo(){setSync("Subiendo…");apiBulk(registros).then(j=>setSync("Subido ✓ ("+(j.n!=null?j.n:registros.length)+" clientes)")).catch(e=>setSync("Error: "+e.message));}
 
   function cargarFilas(filas){const regs=filasARegistros(filas);if(!regs.length){setAviso({tipo:"error",texto:"No se encontraron renglones válidos. Revisa que exista la columna Cliente."});return;}setRegistros(regs);setFEjec("Todos");setFCli("Todos");setBusca("");setAviso({tipo:"ok",texto:`Se cargaron ${regs.length} clientes.`});}
   function onArchivo(e){const file=e.target.files[0];if(!file)return;const fr=new FileReader();fr.onload=ev=>{try{const wb=XLSX.read(new Uint8Array(ev.target.result),{type:"array",cellDates:true});cargarFilas(XLSX.utils.sheet_to_json(hojaClientes(wb),{defval:""}));}catch(err){setAviso({tipo:"error",texto:"No se pudo leer el archivo: "+err.message});}};fr.readAsArrayBuffer(file);e.target.value="";}
@@ -226,6 +244,7 @@ function App(){
       </header>
 
       <main className="mx-auto max-w-6xl px-5 py-5">
+        {cargando && <div className="mb-4 rounded-lg bg-sky-50 text-sky-700 px-3 py-2 text-sm font-medium">Cargando datos de la nube…</div>}
         <div className="mb-5 rounded-xl border border-stone-200 bg-white p-3">
           <div className="flex flex-wrap items-center gap-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-stone-50"><Icon name="upload" size={15}/> Subir Excel / CSV<input type="file" accept=".xlsx,.xls,.csv" onChange={onArchivo} className="hidden"/></label>
@@ -234,6 +253,7 @@ function App(){
             <div className="flex flex-1 items-center gap-1.5 min-w-[240px]"><div className="flex flex-1 items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-2.5"><Icon name="link" size={14} className="text-slate-400"/><input value={sheetUrl} onChange={e=>setSheetUrl(e.target.value)} placeholder="URL de Google Sheet…" className="flex-1 py-1.5 text-sm outline-none"/></div><button onClick={cargarSheet} className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-800">Cargar</button></div>
           </div>
           {aviso && <div className={`mt-2 rounded-md px-3 py-1.5 text-xs font-medium ${aviso.tipo==="ok"?"bg-emerald-50 text-emerald-700":aviso.tipo==="error"?"bg-red-50 text-red-700":"bg-sky-50 text-sky-700"}`}>{aviso.texto}</div>}
+          {CLOUD && <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-2"><span className="text-xs font-semibold text-slate-500">Nube:</span><button onClick={recargar} className="rounded-lg border border-stone-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-stone-50">Recargar</button><button onClick={subirTodo} className="rounded-lg border border-stone-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-stone-50">Subir todo (reemplaza)</button>{sync && <span className="text-xs font-medium text-slate-600">{sync}</span>}</div>}
         </div>
 
         {urgentes.length>0 && <Banner urgentes={urgentes} now={now} onEdit={setEditando} onListo={marcarLlamada} hayVencidas={hayVencidas}/>}
@@ -441,4 +461,3 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
-
