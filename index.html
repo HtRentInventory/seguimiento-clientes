@@ -96,7 +96,7 @@ function estadoCompromiso(r,now){if(!r.compromiso||r.compromisoCumplido)return n
 
 /* ---------- Import ---------- */
 function quita(k){return String(k).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();}
-const MAP={ejecutivo:"ejecutivo",cliente:"cliente","tipo de cliente":"_tcRaw","tipo cliente":"_tcRaw",
+const MAP={ejecutivo:"ejecutivo",cliente:"cliente","folio venta":"folioVenta","folio de venta":"folioVenta","folio jj":"folioJJ","tipo de cliente":"_tcRaw","tipo cliente":"_tcRaw",
   empresa:"empresa",marca:"empresa",correo:"correo","correo electronico":"correo",email:"correo",
   telefono:"telefono",tel:"telefono",celular:"telefono",
   equipo:"_equipoRaw",equipos:"_equipoRaw",remolque:"_equipoRaw",niv:"niv","niv de equipo":"niv",nivs:"niv",
@@ -115,7 +115,7 @@ function normTC(v){return quita(v).includes("recurrente")?"Cliente Recurrente":"
 function parseBitacora(v){if(v==null)return[];const s=String(v).trim();if(!s)return[];return s.split(/\s*;;\s*|\n/).map(x=>x.trim()).filter(Boolean).map((p,i)=>{const parts=p.split("|").map(z=>z.trim());return {id:i+1,fecha:normFecha(parts[0])||HOY,tipo:TIPOS.includes(parts[1])?parts[1]:"Llamada",contacto:CONTACTO.includes(parts[2])?parts[2]:"Contestó",resultado:parts.slice(3).join(" | ")||""};});}
 function filasARegistros(filas){
   return filas.map((row,i)=>{
-    const r={id:i+1,creado:HOY,ejecutivo:"",cliente:"",tipoCliente:"Cliente Nuevo",empresa:"",correo:"",telefono:"",niv:"",equipos:[],tipoVenta:"",plazo:"",adicionales:[],estatus:"Nueva",requisitos:{},queFalta:"",entregaProgramada:"",compromiso:"",compromisoCumplido:false,bitacora:[],notas:""};
+    const r={id:i+1,creado:HOY,ejecutivo:"",cliente:"",folioVenta:"",folioJJ:"",tipoCliente:"Cliente Nuevo",empresa:"",correo:"",telefono:"",niv:"",equipos:[],tipoVenta:"",plazo:"",adicionales:[],estatus:"Nueva",requisitos:{},queFalta:"",entregaProgramada:"",compromiso:"",compromisoCumplido:false,bitacora:[],notas:""};
     for(const k in row){const key=quita(k);const f=MAP[key];if(f){r[f]=row[k];}else if(REQ_MAP[key]!==undefined){const v=quita(row[k]);r.requisitos[REQ_MAP[key]]=VERDAD.has(v)?"recibido":NOAPLICA.has(v)?"na":"pendiente";}}
     r.tipoCliente=normTC(r._tcRaw); delete r._tcRaw;
     r.entregaProgramada=r.entregaProgramada?normFecha(r.entregaProgramada):"";
@@ -126,7 +126,7 @@ function filasARegistros(filas){
     r.adicionales=r._adiRaw?String(r._adiRaw).split(",").map(x=>x.trim()).filter(Boolean):[]; delete r._adiRaw;
     r.bitacora=parseBitacora(r._bitRaw); delete r._bitRaw;
     r.requisitos={...reqPend(r.tipoCliente),...r.requisitos};
-    ["ejecutivo","cliente","empresa","correo","telefono","niv","queFalta","notas"].forEach(k=>r[k]=String(r[k]||"").trim());
+    ["ejecutivo","cliente","folioVenta","folioJJ","empresa","correo","telefono","niv","queFalta","notas"].forEach(k=>r[k]=String(r[k]||"").trim());
     r.estatus=ESTATUS.includes(String(r.estatus).trim())?String(r.estatus).trim():"Nueva";
     return r;
   }).filter(r=>r.cliente);
@@ -136,18 +136,18 @@ function filasARegistros(filas){
 function demo(now){
   const f=m=>{const d=new Date(now+m*60000);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;};
   const B=(...es)=>es.map((e,i)=>({id:i+1,...e}));
-  const b={ejecutivo:"Sara Alonso",correo:"",compromiso:"",compromisoCumplido:false,creado:HOY,niv:""};
+  const b={ejecutivo:"Sara Alonso",correo:"",compromiso:"",compromisoCumplido:false,creado:HOY,niv:"",folioVenta:"",folioJJ:""};
   return [
     {...b,id:1,cliente:"LUIS ERNESTO TEISSIER ZAVALA",tipoCliente:"Cliente Nuevo",empresa:"HT",telefono:"877 116 1535",equipos:[{tipo:"Plataforma Multimodal 53'",cantidad:2}],tipoVenta:"Arrendamiento",plazo:36,adicionales:["Eje retractil","Winches"],estatus:"Documentando",requisitos:reqObj(REQ_NUEVO,[0,2,4],[]),queFalta:"Falta acta constitutiva y poder del rep. legal",entregaProgramada:"",compromiso:f(-50),notas:"Llega el 15 de agosto.",bitacora:B({fecha:addDays(HOY,-3),tipo:"Llamada",contacto:"Contestó",resultado:"Interesado, se le solicitó expediente completo."},{fecha:addDays(HOY,-1),tipo:"WhatsApp",contacto:"No contestó",resultado:"Se reenvió checklist de documentos."})},
     {...b,id:2,cliente:"HUMBERTO AMEZCUA TORRES",tipoCliente:"Cliente Recurrente",empresa:"HT",telefono:"55 1881 3176",niv:"3H1AMZ0012345",equipos:[{tipo:"Plataforma Multimodal",cantidad:1}],tipoVenta:"Arrendamiento",plazo:24,adicionales:["Eje retractil"],estatus:"Pend. entrega Cliente",requisitos:reqObj(REQ_RECURRENTE,[0,1,2],[]),queFalta:"",entregaProgramada:addDays(HOY,2),notas:"Entrega en Guadalajara sin costo.",bitacora:B({fecha:addDays(HOY,-2),tipo:"Llamada",contacto:"Contestó",resultado:"Cliente recurrente, expediente actualizado recibido."},{fecha:HOY,tipo:"WhatsApp",contacto:"Contestó",resultado:"Confirma logística de entrega para el jueves."})},
     {...b,id:3,cliente:"VERONICA SARAHI SABALA DE LEON",tipoCliente:"Cliente Nuevo",empresa:"HT",telefono:"33 2030 2269",equipos:[{tipo:"Plataforma Forza HQ Multimodal",cantidad:1}],tipoVenta:"Renta Pura",plazo:12,adicionales:["Eje retractil"],estatus:"Presentación con Cliente",requisitos:reqObj(REQ_NUEVO,[0],[]),queFalta:"Confirmar si continúa",entregaProgramada:"",compromiso:f(35),notas:"",bitacora:B({fecha:HOY,tipo:"Llamada",contacto:"No contestó",resultado:"No contestó, se agenda recontacto."})},
     {...b,id:4,cliente:"GLOBAL NAVAL TF",tipoCliente:"Cliente Nuevo",empresa:"3C",telefono:"55 7674 7238",equipos:[{tipo:"Porta 40/20/20",cantidad:1}],tipoVenta:"Financiamiento",plazo:10,adicionales:["Eje retractil","Rines y Llantas"],estatus:"Documentando",requisitos:reqObj(REQ_NUEVO,[0,2],[]),queFalta:"Faltan estados de cuenta y constancia fiscal",entregaProgramada:"",notas:"",bitacora:B({fecha:HOY,tipo:"Correo",contacto:"Contestó",resultado:"Se solicitaron documentos para financiamiento."})},
     {...b,id:5,cliente:"CINTHIA RIOS GONZALEZ",tipoCliente:"Cliente Recurrente",empresa:"HT",telefono:"753 162 9434",equipos:[{tipo:"Porta 40/20",cantidad:1}],tipoVenta:"Arrendamiento",plazo:48,adicionales:["Eje retractil","Rines y Llantas"],estatus:"Asignación y Contrato",requisitos:reqObj(REQ_RECURRENTE,[0,1],[]),queFalta:"Falta opinión de cumplimiento",entregaProgramada:"",notas:"Stock Lázaro.",bitacora:B({fecha:addDays(HOY,-1),tipo:"WhatsApp",contacto:"Contestó",resultado:"Expediente enviado a Contratos, falta opinión de cumplimiento."})},
-    {...b,id:6,cliente:"ABRAHAM ROGELIO GONZALEZ OROZCO",tipoCliente:"Cliente Recurrente",empresa:"JJ",telefono:"312 140 1076",niv:"3H1AB0098877",equipos:[{tipo:"Portacontenedor 40/20 Neway",cantidad:1}],tipoVenta:"Contado",plazo:"",adicionales:["Eje retractil"],estatus:"Programación entrega",requisitos:reqObj(REQ_RECURRENTE,[0,1,2],[]),queFalta:"",entregaProgramada:addDays(HOY,3),notas:"Liquidado.",bitacora:B({fecha:HOY,tipo:"Llamada",contacto:"Contestó",resultado:"Coordinamos entrega para el viernes."})},
+    {...b,id:6,cliente:"ABRAHAM ROGELIO GONZALEZ OROZCO",tipoCliente:"Cliente Recurrente",empresa:"JJ",telefono:"312 140 1076",niv:"3H1AB0098877",folioVenta:"V-10245",folioJJ:"JJ-8891",equipos:[{tipo:"Portacontenedor 40/20 Neway",cantidad:1}],tipoVenta:"Contado",plazo:"",adicionales:["Eje retractil"],estatus:"Programación entrega",requisitos:reqObj(REQ_RECURRENTE,[0,1,2],[]),queFalta:"",entregaProgramada:addDays(HOY,3),notas:"Liquidado.",bitacora:B({fecha:HOY,tipo:"Llamada",contacto:"Contestó",resultado:"Coordinamos entrega para el viernes."})},
     {...b,id:7,cliente:"IMPULSO CONSTRUCTOR",tipoCliente:"Cliente Nuevo",empresa:"HT",telefono:"443 146 0073",niv:"3H1IMP0451, 3H1IMP0452, 3H1DLY0088",equipos:[{tipo:"Porta 40/20",cantidad:2},{tipo:"Dolly",cantidad:1}],tipoVenta:"Arrendamiento",plazo:36,adicionales:["Eje retractil","Winches","Rines y Llantas"],estatus:"Pend. entrega Fábrica",requisitos:reqObj(REQ_NUEVO,[0,1,2,3,4,5,6,7,8,9,10,11,12],[]),queFalta:"Falta grabar video de fachada y de firma",entregaProgramada:"",compromiso:f(190),notas:"Compra full.",bitacora:B({fecha:addDays(HOY,-1),tipo:"Reunión",contacto:"Contestó",resultado:"Firma de contrato, se agenda video."})},
     {...b,id:8,cliente:"COREY KAPITAL",tipoCliente:"Cliente Nuevo",empresa:"JJ",telefono:"",equipos:[{tipo:"Plana 40 HQ 3E",cantidad:5}],tipoVenta:"Contado",plazo:"",adicionales:["Rines y Llantas","Eje retractil","Winches"],estatus:"Nueva",requisitos:reqPend("Cliente Nuevo"),queFalta:"Sin pago aún",entregaProgramada:"",notas:"",bitacora:[]},
     {...b,id:9,cliente:"JUAN DANIEL CAZAREZ VELAZQUEZ",tipoCliente:"Cliente Nuevo",empresa:"JJ",telefono:"646 275 4026",equipos:[{tipo:"Porta 40/20 NW",cantidad:2},{tipo:"Dolly Gamy",cantidad:1}],tipoVenta:"Contado",plazo:"",adicionales:["Eje retractil"],estatus:"Documentando",requisitos:reqObj(REQ_NUEVO,[0,2],[]),queFalta:"Pendiente NIV del dolly y pago en sistema",entregaProgramada:"",compromiso:f(15),notas:"",bitacora:B({fecha:HOY,tipo:"WhatsApp",contacto:"No contestó",resultado:"Full de 2 portas + dolly, sin respuesta."})},
-    {...b,id:10,cliente:"RUBEN MORAN SANCHEZ",tipoCliente:"Cliente Recurrente",empresa:"JJ",telefono:"312 170 4688",equipos:[{tipo:"Dolly Operbus",cantidad:1}],tipoVenta:"Contado",plazo:"",adicionales:[],estatus:"Entregado",requisitos:reqObj(REQ_RECURRENTE,[0,1,2],[]),queFalta:"",entregaProgramada:addDays(HOY,-1),notas:"Entregado en patio.",bitacora:B({fecha:addDays(HOY,-1),tipo:"Llamada",contacto:"Contestó",resultado:"Entrega concluida y firmada."})},
+    {...b,id:10,cliente:"RUBEN MORAN SANCHEZ",tipoCliente:"Cliente Recurrente",empresa:"JJ",telefono:"312 170 4688",folioVenta:"V-09980",folioJJ:"JJ-8710",equipos:[{tipo:"Dolly Operbus",cantidad:1}],tipoVenta:"Contado",plazo:"",adicionales:[],estatus:"Entregado",requisitos:reqObj(REQ_RECURRENTE,[0,1,2],[]),queFalta:"",entregaProgramada:addDays(HOY,-1),notas:"Entregado en patio.",bitacora:B({fecha:addDays(HOY,-1),tipo:"Llamada",contacto:"Contestó",resultado:"Entrega concluida y firmada."})},
     {...b,id:11,cliente:"ORION INGENIERIA INDUSTRIAL",tipoCliente:"Cliente Nuevo",empresa:"HT",telefono:"56 3692 6998",equipos:[{tipo:"Plataforma 40\" 2 ejes",cantidad:1}],tipoVenta:"Arrendamiento",plazo:24,adicionales:["Eje retractil","Rines y Llantas"],estatus:"Cancelado",requisitos:reqObj(REQ_NUEVO,[0,2],[]),queFalta:"",entregaProgramada:"",notas:"Stock Lázaro liberado.",bitacora:B({fecha:HOY,tipo:"Correo",contacto:"Contestó",resultado:"Cliente canceló la solicitud."})},
   ];
 }
@@ -156,7 +156,7 @@ function demo(now){
 
 /* ---------- Exportación con Dashboard ---------- */
 function hojaClientes(wb){const n=wb.SheetNames.find(s=>quita(s)==="clientes")||wb.SheetNames[0];return wb.Sheets[n];}
-function filaCliente(r){const o={"Ejecutivo":r.ejecutivo,"Cliente":r.cliente,"Tipo de cliente":r.tipoCliente,"Empresa":r.empresa,"Correo":r.correo,"Teléfono":r.telefono,"Equipo":(r.equipos||[]).filter(e=>e.tipo).map(e=>`${e.cantidad||1} x ${e.tipo}`).join(" ; "),"NIV":r.niv||"","Tipo de venta":r.tipoVenta,"Plazo (meses)":r.plazo||"","Adicionales":(r.adicionales||[]).join(", "),"Estatus":r.estatus};REQ_ALL.forEach(k=>{const v=(r.requisitos||{})[k];o[k]=v==="recibido"?"SI":v==="na"?"NA":"";});o["Pendiente actual"]=r.queFalta;o["Entrega programada"]=r.entregaProgramada;o["Compromiso"]=r.compromiso?r.compromiso.replace("T"," "):"";o["Bitácora"]=(r.bitacora||[]).map(be=>`${be.fecha} | ${be.tipo} | ${be.contacto} | ${be.resultado}`).join(" ;; ");o["Notas"]=r.notas;return o;}
+function filaCliente(r){const o={"Ejecutivo":r.ejecutivo,"Cliente":r.cliente,"Folio Venta":r.folioVenta||"","Folio JJ":r.folioJJ||"","Tipo de cliente":r.tipoCliente,"Empresa":r.empresa,"Correo":r.correo,"Teléfono":r.telefono,"Equipo":(r.equipos||[]).filter(e=>e.tipo).map(e=>`${e.cantidad||1} x ${e.tipo}`).join(" ; "),"NIV":r.niv||"","Tipo de venta":r.tipoVenta,"Plazo (meses)":r.plazo||"","Adicionales":(r.adicionales||[]).join(", "),"Estatus":r.estatus};REQ_ALL.forEach(k=>{const v=(r.requisitos||{})[k];o[k]=v==="recibido"?"SI":v==="na"?"NA":"";});o["Pendiente actual"]=r.queFalta;o["Entrega programada"]=r.entregaProgramada;o["Compromiso"]=r.compromiso?r.compromiso.replace("T"," "):"";o["Bitácora"]=(r.bitacora||[]).map(be=>`${be.fecha} | ${be.tipo} | ${be.contacto} | ${be.resultado}`).join(" ;; ");const dg=diasEnGestion(r);o["Días en gestión"]=(dg===null?"":dg);o["Estado gestión"]=(dg===null?"":dg<=20?"En tiempo":dg<=40?"Medio plazo":dg<=60?"Por vencer":"Vencido");o["Notas"]=r.notas;return o;}
 function libroSimple(registros){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(registros.map(filaCliente)),"Clientes");return wb;}
 function detallePor(registros,cats,keyFn){const aoa=[];const anchor={};cats.forEach(cat=>{const items=registros.filter(r=>keyFn(r)===cat);if(!items.length)return;anchor[cat]=aoa.length+1;aoa.push([`${cat} — ${items.length} cliente(s)`]);aoa.push(["Cliente","Ejecutivo","Empresa","Equipo","Expediente","Última interacción","Entrega","Tipo venta"]);items.forEach(r=>{const st=reqStats(r);const u=ultInter(r);aoa.push([r.cliente,r.ejecutivo,r.empresa,equiposTxt(r),st.completo?"Completo":`${st.recibido}/${st.aplicables}`,u?`${u.fecha} · ${u.tipo} · ${u.contacto}`:"",r.entregaProgramada||"",(r.tipoVenta||"")+(r.plazo?` ${r.plazo}m`:"")]);});aoa.push([]);});return {aoa,anchor};}
 function celdaLink(n,sheet,row){if(!sheet||!row)return n;return {f:`HYPERLINK("#${sheet}!A${row}","${n}")`,v:String(n)};}
@@ -206,7 +206,7 @@ function App(){
   function cargarSheet(){if(!sheetUrl.trim()){setAviso({tipo:"error",texto:"Pega la URL de tu Google Sheet."});return;}setAviso({tipo:"info",texto:"Cargando desde Google Sheet…"});fetch(csvUrl(sheetUrl.trim())).then(r=>{if(!r.ok)throw new Error(r.status);return r.text();}).then(txt=>{const wb=XLSX.read(txt,{type:"string"});cargarFilas(XLSX.utils.sheet_to_json(hojaClientes(wb),{defval:""}));}).catch(()=>setAviso({tipo:"error",texto:"No se pudo leer la hoja. Debe estar compartida como «Cualquiera con el enlace» o publicada como CSV."}));}
   function exportar(){
     const _ignore=0; const filas=[]; return XLSX.writeFile(libroSimple(registros),"seguimiento_htrent.xlsx"); const _dead=registros.map(r=>{
-      const o={"Ejecutivo":r.ejecutivo,"Cliente":r.cliente,"Tipo de cliente":r.tipoCliente,"Empresa":r.empresa,"Correo":r.correo,"Teléfono":r.telefono,
+      const o={"Ejecutivo":r.ejecutivo,"Cliente":r.cliente,"Folio Venta":r.folioVenta||"","Folio JJ":r.folioJJ||"","Tipo de cliente":r.tipoCliente,"Empresa":r.empresa,"Correo":r.correo,"Teléfono":r.telefono,
         "Equipo":(r.equipos||[]).filter(e=>e.tipo).map(e=>`${e.cantidad||1} x ${e.tipo}`).join(" ; "),
         "NIV":r.niv||"","Tipo de venta":r.tipoVenta,"Plazo (meses)":r.plazo||"","Adicionales":(r.adicionales||[]).join(", "),"Estatus":r.estatus};
       REQ_ALL.forEach(k=>{const v=(r.requisitos||{})[k];o[k]=v==="recibido"?"SI":v==="na"?"NA":"";});
@@ -293,6 +293,19 @@ function VistaLista({registros,now,onEdit}){
 }
 
 /* ---------- Expediente bar ---------- */
+function primeraInter(r){const b=(r.bitacora||[]).filter(x=>x.fecha).slice().sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));return b[0]||null;}
+function diasEnGestion(r){const p=primeraInter(r);if(!p)return null;return Math.round((parse(HOY)-parse(p.fecha))/86400000);}
+function Cronometro({r}){
+  if(["Entregado","Cancelado"].includes(r.estatus))return null;
+  const d=diasEnGestion(r); if(d===null)return null;
+  const pct=Math.min(100,Math.max(0,d/60*100)); const vencido=d>60;
+  const col=d<=20?"text-emerald-600":d<=40?"text-amber-600":d<=60?"text-orange-600":"text-red-600";
+  return (<div className="mt-2">
+    <div className="flex items-center justify-between text-xs mb-1"><span className="font-semibold text-slate-600 inline-flex items-center gap-1"><Icon name="clock" size={12}/> Gestión (60 días)</span><span className={`mono font-bold ${col}`}>{vencido?`Vencido +${d-60}d`:`Día ${d} de 60`}</span></div>
+    <div className="relative h-2 w-full rounded-full overflow-hidden" style={{background:"linear-gradient(to right,#22c55e 0%,#22c55e 28%,#fbbf24 40%,#f59e0b 60%,#f97316 78%,#ef4444 100%)"}}><div className="absolute -top-0.5 h-3 w-1 rounded bg-slate-900" style={{left:`calc(${pct}% - 2px)`}}></div></div>
+    <p className="mt-1 text-[11px] text-slate-400">{vencido?"Fuera del plazo de 60 días":`Quedan ${60-d} días para entregar`}</p>
+  </div>);
+}
 function ReqBarra({r}){
   const st=reqStats(r);
   if(st.completo)return <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"><Icon name="clip" size={12}/> Expediente completo</div>;
@@ -311,12 +324,12 @@ function Tarjeta({r,now,onEdit,onListo}){
   const ring=e==="vencido"?"ring-2 ring-red-400 border-red-300":e==="proximo"?"ring-2 ring-amber-400 border-amber-300":"border-stone-200";
   return (<div className={`group relative w-full overflow-hidden rounded-xl border bg-white transition-shadow hover:shadow-md ${ring}`}><span className={`absolute inset-y-0 left-0 w-1.5 ${c.spine}`}></span>
     <button onClick={()=>onEdit(r)} className="block w-full p-4 pl-5 text-left">
-      <div className="flex items-start justify-between gap-2"><div className="flex items-center gap-2 min-w-0">{e && <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${e==="vencido"?"bg-red-500":e==="proximo"?"bg-amber-500":"bg-sky-400"}`}></span>}<div className="min-w-0"><div className="flex items-center gap-1.5"><p className={`font-bold leading-tight truncate ${e==="vencido"?"text-red-700":e==="proximo"?"text-amber-800":"text-slate-900"}`}>{r.cliente}</p></div><p className="text-xs text-slate-500 mt-0.5">{r.ejecutivo}</p></div></div><div className="flex flex-col items-end gap-1 shrink-0"><Badge estatus={r.estatus}/><div className="flex items-center gap-1"><ClienteTipoTag tc={r.tipoCliente}/><EmpresaTag empresa={r.empresa}/></div></div></div>
+      <div className="flex items-start justify-between gap-2"><div className="flex items-center gap-2 min-w-0">{e && <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${e==="vencido"?"bg-red-500":e==="proximo"?"bg-amber-500":"bg-sky-400"}`}></span>}<div className="min-w-0"><div className="flex items-center gap-1.5"><p className={`font-bold leading-tight truncate ${e==="vencido"?"text-red-700":e==="proximo"?"text-amber-800":"text-slate-900"}`}>{r.cliente}</p></div><p className="text-xs text-slate-500 mt-0.5">{r.ejecutivo}</p>{(r.folioVenta||r.folioJJ)&&<p className="text-[10px] text-slate-400 mono mt-0.5">{r.folioVenta?`V: ${r.folioVenta}`:""}{r.folioVenta&&r.folioJJ?"  ·  ":""}{r.folioJJ?`JJ: ${r.folioJJ}`:""}</p>}</div></div><div className="flex flex-col items-end gap-1 shrink-0"><Badge estatus={r.estatus}/><div className="flex items-center gap-1"><ClienteTipoTag tc={r.tipoCliente}/><EmpresaTag empresa={r.empresa}/></div></div></div>
       {eqt && <p className="mt-2 text-xs font-medium text-slate-600 inline-flex items-start gap-1"><Icon name="truck" size={12} className="text-slate-400 mt-0.5 shrink-0"/><span>{eqt}</span></p>}
       {r.niv && <p className="mt-1 text-xs text-slate-500 mono truncate">NIV: {String(r.niv).split(/[\n,]+/).map(x=>x.trim()).filter(Boolean).join(", ")}</p>}{r.tipoVenta && <p className="mt-1 text-xs text-slate-500"><span className="font-semibold text-slate-600">{r.tipoVenta}</span>{r.plazo?` · ${r.plazo} meses`:""}</p>}
       <div className="mt-2 rounded-md bg-stone-50 border border-stone-100 px-2 py-1.5 text-xs">{u?(<div className="flex items-start gap-1.5"><Icon name="history" size={12} className="text-slate-400 mt-0.5 shrink-0"/><div className="min-w-0"><span className="font-semibold text-slate-600">{corto(u.fecha)} · {u.tipo} · </span><ContactoTag contacto={u.contacto} inline/>{u.resultado && <span className="text-slate-600"> — {u.resultado}</span>}<span className="text-slate-400 mono"> · {nb} {nb===1?"interacción":"interacciones"}</span></div></div>):<span className="text-slate-400 inline-flex items-center gap-1"><Icon name="history" size={12}/> Sin interacciones aún</span>}</div>
       {r.adicionales&&r.adicionales.length>0 && <div className="mt-2 flex flex-wrap gap-1">{r.adicionales.map(a=><span key={a} className="inline-flex items-center gap-0.5 rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500"><Icon name="tag" size={9}/>{a}</span>)}</div>}
-      <ReqBarra r={r}/>
+      <Cronometro r={r}/><ReqBarra r={r}/>
       {r.queFalta && <div className="mt-2 flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-800"><Icon name="alert" size={13} className="mt-0.5 shrink-0"/><span><span className="font-semibold">Pendiente:</span> {r.queFalta}</span></div>}
       {r.entregaProgramada && (r.estatus==="Entregado"?<div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-teal-300 bg-teal-50 px-2.5 py-1.5 text-xs font-bold text-teal-700"><Icon name="check" size={14}/> Entregado el {largo(r.entregaProgramada)}</div>:<div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700"><Icon name="truck" size={14}/> Entrega programada: {largo(r.entregaProgramada)}</div>)}
     </button>
@@ -331,8 +344,8 @@ function TarjetaMini({r,now,onEdit}){
 
 /* ---------- Modal ---------- */
 function Modal({inicial,fEjec,ejecutivos,cliPorEjec,onClose,onSave}){
-  const base=inicial||{creado:HOY,ejecutivo:fEjec!=="Todos"?fEjec:(ejecutivos[0]||""),cliente:"",tipoCliente:"Cliente Nuevo",empresa:"",correo:"",telefono:"",niv:"",equipos:[{tipo:"",cantidad:1}],tipoVenta:"",plazo:"",adicionales:[],estatus:"Nueva",requisitos:reqPend("Cliente Nuevo"),queFalta:"",entregaProgramada:"",compromiso:"",compromisoCumplido:false,bitacora:[],notas:""};
-  const [f,setF]=useState({...base,niv:base.niv||"",equipos:(base.equipos&&base.equipos.length)?base.equipos.map(e=>({...e})):[{tipo:"",cantidad:1}],adicionales:[...(base.adicionales||[])],requisitos:{...reqPend(base.tipoCliente||"Cliente Nuevo"),...(base.requisitos||{})},bitacora:[...(base.bitacora||[])]});
+  const base=inicial||{creado:HOY,ejecutivo:fEjec!=="Todos"?fEjec:(ejecutivos[0]||""),cliente:"",folioVenta:"",folioJJ:"",tipoCliente:"Cliente Nuevo",empresa:"",correo:"",telefono:"",niv:"",equipos:[{tipo:"",cantidad:1}],tipoVenta:"",plazo:"",adicionales:[],estatus:"Nueva",requisitos:reqPend("Cliente Nuevo"),queFalta:"",entregaProgramada:"",compromiso:"",compromisoCumplido:false,bitacora:[],notas:""};
+  const [f,setF]=useState({...base,niv:base.niv||"",folioVenta:base.folioVenta||"",folioJJ:base.folioJJ||"",equipos:(base.equipos&&base.equipos.length)?base.equipos.map(e=>({...e})):[{tipo:"",cantidad:1}],adicionales:[...(base.adicionales||[])],requisitos:{...reqPend(base.tipoCliente||"Cliente Nuevo"),...(base.requisitos||{})},bitacora:[...(base.bitacora||[])]});
   const [nb,setNb]=useState({fecha:HOY,tipo:"Llamada",contacto:"Contestó",resultado:""});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const setTC=v=>setF(p=>({...p,tipoCliente:v,requisitos:{...reqPend(v),...p.requisitos}}));
@@ -360,6 +373,7 @@ function Modal({inicial,fEjec,ejecutivos,cliPorEjec,onClose,onSave}){
       <div className="p-5 space-y-4">
         <div className="grid grid-cols-2 gap-3"><Campo label="Ejecutivo"><input list="dl-ejec" value={f.ejecutivo} onChange={e=>set("ejecutivo",e.target.value)} className={inp} placeholder="Nombre…"/></Campo><Campo label="Empresa / Marca"><input list="dl-emp" value={f.empresa} onChange={e=>set("empresa",e.target.value)} className={inp} placeholder="HT / JJ / 3C"/></Campo></div>
         <Campo label="Cliente"><input list="dl-cli" value={f.cliente} onChange={e=>set("cliente",e.target.value)} className={inp} placeholder="Nombre o empresa del cliente…"/></Campo>
+        <div className="grid grid-cols-2 gap-3"><Campo label="Folio Venta"><input value={f.folioVenta} onChange={e=>set("folioVenta",e.target.value)} className={inp} placeholder="Ej. V-10245"/></Campo><Campo label="Folio JJ"><input value={f.folioJJ} onChange={e=>set("folioJJ",e.target.value)} className={inp} placeholder="Ej. JJ-8891"/></Campo></div>
 
         {/* Tipo de cliente */}
         <div><span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Tipo de cliente</span>
@@ -427,3 +441,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
+
