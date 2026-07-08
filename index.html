@@ -22,7 +22,7 @@ const { useState, useMemo, useEffect } = React;
    2) Pon EXACTAMENTE el mismo token en API_TOKEN
    Si las dejas vacías, la app funciona en modo local (sin nube).
    ============================================================ */
-const API_URL = "https://script.google.com/macros/s/AKfycbypoSMCRnhBgkQP6mC9HjMPylOandFgbAOGidpdeOMZPmgN0RYaEQTqzgFc8oQukRKh/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbztAVghizh_eVDXNY7eMcBzReaVdXQQwSmULoWIePfyI9iHxWOxoS_IwZ5yS5zixi6Y/exec";
 const API_TOKEN = "BETHY-2026";
 const CLOUD = API_URL.length > 10;
 async function apiList(){const r=await fetch(`${API_URL}?action=list&token=${encodeURIComponent(API_TOKEN)}`);const j=await r.json();if(!j.ok)throw new Error(j.error||"error");return j.data||[];}
