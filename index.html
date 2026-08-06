@@ -218,6 +218,40 @@ function Puerta({onEntrar}){
   </div>);
 }
 
+function interpretarCli(texto, ctx){
+  const t=" "+_norm(texto)+" ";
+  const res={busca:[]}; const hits=[];
+  const STOP=new Set(["de","del","la","el","los","las","con","en","y","o","que","me","muestra","muestrame","dame","quiero","ver","todos","todas","clientes","cliente","por","para","un","una","estatus","etapa","los"]);
+  const setExacto=(lista,label,key)=>{let mejor=null;(lista||[]).forEach(op=>{const n=_norm(op);if(!n)return;const re=new RegExp("(^| )"+n.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"( |$)");if(re.test(t)){if(!mejor||n.length>_norm(mejor).length)mejor=op;}});if(mejor){res[key]=mejor;hits.push(label+": "+mejor);}return mejor;};
+  setExacto(ctx.ejecutivos,"Ejecutivo","ejec");
+  setExacto(ctx.estatus,"Etapa","estatus");
+  if(!res.estatus){
+    if(/ entregad/.test(t)){res.estatus="Entregado";hits.push("Etapa: Entregado");}
+    else if(/ cancelad/.test(t)){res.estatus="Cancelado";hits.push("Etapa: Cancelado");}
+  }
+  // palabras restantes -> búsqueda por texto (nombre de cliente, NIV, folio, equipo, empresa, contrato)
+  const usados=_norm([res.ejec,res.estatus].filter(Boolean).join(" ")).split(" ");
+  const palabras=_norm(texto).split(" ").filter(w=>w.length>=3&&!STOP.has(w)&&usados.indexOf(w)<0);
+  if(palabras.length){res.busca=[...new Set(palabras)];hits.push("Texto: "+res.busca.join(" "));}
+  return {res,hits};
+}
+
+function BuscadorIA({onAplicar,ctx}){
+  const [q,setQ]=useState("");const [msg,setMsg]=useState(null);
+  const aplicar=()=>{if(!q.trim())return;const {res,hits}=interpretarCli(q,ctx);
+    if(hits.length===0){setMsg({ok:false,txt:"No reconocí filtros. Prueba con ejecutivo, etapa (documentando, entregado, cancelado…), o nombre/NIV/folio."});return;}
+    onAplicar(res);setMsg({ok:true,txt:"Aplicado → "+hits.join(" · ")});};
+  return (<div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-3">
+    <div className="flex items-center gap-2">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-indigo-600 text-white text-xs font-bold">IA</span>
+      <input value={q} onChange={e=>{setQ(e.target.value);setMsg(null);}} onKeyDown={e=>{if(e.key==="Enter")aplicar();}} placeholder="Escribe: clientes de Omar entregados… o documentando de Aracely…" className="flex-1 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400"/>
+      <button onClick={aplicar} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Buscar</button>
+    </div>
+    {msg && <p className={`mt-2 text-xs font-medium ${msg.ok?"text-emerald-700":"text-amber-700"}`}>{msg.txt}</p>}
+    <p className="mt-1.5 text-[11px] text-slate-400">Búsqueda inteligente: interpreta tu frase y aplica los filtros. Todo se procesa en tu navegador.</p>
+  </div>);
+}
+
 function App(){
   const [modo,setModo]=useState(null);
   const puedeEditar=modo==="edit";
@@ -239,11 +273,12 @@ function App(){
   useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),30000);return()=>clearInterval(t);},[]);
   useEffect(()=>{if(!CLOUD)return;setCargando(true);apiList().then(d=>{setRegistros(d.map(normEst));setCargando(false);}).catch(err=>{setCargando(false);setAviso({tipo:"error",texto:"No se pudo cargar de la nube: "+err.message});});},[]);
 
+  function aplicarIA(res){setFEjec(res.ejec||"Todos");setFEstatus(res.estatus||"");setBusca((res.busca&&res.busca.length)?res.busca.join(" "):"");setFCli&&setFCli("Todos");}
   const ejecutivos=useMemo(()=>{const s=[...new Set(registros.map(r=>r.ejecutivo).filter(Boolean))].sort();return s.length?s:EJEC_DEF;},[registros]);
   const cliPorEjec=useMemo(()=>{const m={};registros.forEach(r=>{if(!r.ejecutivo)return;(m[r.ejecutivo]=m[r.ejecutivo]||new Set()).add(r.cliente);});const o={};Object.keys(m).forEach(k=>o[k]=[...m[k]].filter(Boolean).sort());return Object.keys(o).length?o:CLI_DEF;},[registros]);
   const clientesOpc=fEjec==="Todos"?["Todos",...new Set(Object.values(cliPorEjec).flat())]:["Todos",...(cliPorEjec[fEjec]||[])];
 
-  const pasa=r=>(fEjec==="Todos"||r.ejecutivo===fEjec)&&(fCli==="Todos"||r.cliente===fCli)&&(!busca||quita((r.cliente||"")+" "+(r.niv||"")+" "+(r.folioVenta||"")+" "+(r.folioJJ||"")+" "+(r.telefono||"")).includes(quita(busca)))&&(fEstatus===""||r.estatus===fEstatus);
+  const pasa=r=>(fEjec==="Todos"||r.ejecutivo===fEjec)&&(fCli==="Todos"||r.cliente===fCli)&&(!busca||(()=>{const h=quita((r.cliente||"")+" "+(r.niv||"")+" "+(r.folioVenta||"")+" "+(r.folioJJ||"")+" "+(r.telefono||"")+" "+(r.ejecutivo||"")+" "+(r.empresa||"")+" "+(r.tipoContrato||"")+" "+((r.equipos||[]).map(e=>e.tipo).join(" ")));return quita(busca).split(" ").filter(Boolean).every(w=>h.includes(w));})())&&(fEstatus===""||r.estatus===fEstatus);
   const visibles=useMemo(()=>registros.filter(pasa),[registros,fEjec,fCli,busca,fEstatus]);
   const porEjec=useMemo(()=>registros.filter(r=>fEjec==="Todos"||r.ejecutivo===fEjec),[registros,fEjec]);
   const etapaCounts=useMemo(()=>ESTATUS.map(e=>({est:e,n:porEjec.filter(r=>r.estatus===e).length})),[porEjec]);
@@ -265,6 +300,7 @@ function App(){
   const cancelados=porEjec.filter(r=>(r.estatuses||[]).includes("Cancelado"));
   const cancelClientes=cancelados.length;
   const cancelEquipos=cancelados.reduce((s,r)=>s+numEquipos(r),0);
+  const pendEntregar=Math.max(0,totalEquipos-entregEquipos-cancelEquipos);
 
   const guardar=reg=>{const id=reg.id||(Math.max(0,...registros.map(x=>x.id))+1);const saved=normEst({...reg,id});if((saved.estatuses||[]).includes("Entregado")){if(!saved.fechaEntregadoMarcado)saved.fechaEntregadoMarcado=HOY;}else{saved.fechaEntregadoMarcado="";}setRegistros(prev=>prev.some(r=>r.id===id)?prev.map(r=>r.id===id?saved:r):[...prev,saved]);setEditando(null);if(CLOUD){setSync("Guardando…");apiSave(saved).then(()=>setSync("Guardado en la nube ✓")).catch(()=>setSync("⚠ Error al guardar en la nube"));}};
   const marcarLlamada=id=>{setRegistros(prev=>prev.map(r=>r.id===id?{...r,compromisoCumplido:true}:r));if(CLOUD){const rec=registros.find(r=>r.id===id);if(rec)apiSave({...rec,compromisoCumplido:true}).catch(()=>{});}};
@@ -317,11 +353,12 @@ function App(){
 
         {urgentes.length>0 && <Banner urgentes={urgentes} now={now} onEdit={setEditando} onListo={marcarLlamada} hayVencidas={hayVencidas}/>}
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-3 mb-5">
           <Kpi icon="user" label={fEjec==="Todos"?"Clientes (total)":"Clientes · "+fEjec} valor={totalClientes} tono="text-slate-900"/>
           <Kpi icon="truck" label={fEjec==="Todos"?"Equipos · unidades":"Equipos · "+fEjec} valor={totalEquipos} tono="text-amber-600"/>
           <button onClick={()=>{setFEstatus(fEstatus==="Entregado"?"":"Entregado");setVista("clientes");}} className={`rounded-xl border bg-white px-4 py-3 text-left transition-all ${fEstatus==="Entregado"?"border-teal-400 ring-2 ring-teal-200":"border-stone-200 hover:bg-stone-50"}`}><div className="flex items-center gap-1.5 text-slate-400"><Icon name="check" size={16}/><span className="text-xs font-medium text-slate-500">{fEjec==="Todos"?"Entregados":"Entregados · "+fEjec}</span></div><p className="mt-1 text-2xl font-bold mono text-teal-600 leading-none">{entregEquipos}<span className="text-xs font-medium text-slate-400"> equipos</span></p><p className="text-[11px] text-slate-400 mt-0.5">{entregClientes} cliente(s)</p></button>
           <button onClick={()=>{setFEstatus(fEstatus==="Cancelado"?"":"Cancelado");setVista("clientes");}} className={`rounded-xl border bg-white px-4 py-3 text-left transition-all ${fEstatus==="Cancelado"?"border-rose-400 ring-2 ring-rose-200":"border-stone-200 hover:bg-stone-50"}`}><div className="flex items-center gap-1.5 text-slate-400"><Icon name="x" size={16}/><span className="text-xs font-medium text-slate-500">{fEjec==="Todos"?"Cancelados":"Cancelados · "+fEjec}</span></div><p className="mt-1 text-2xl font-bold mono text-rose-600 leading-none">{cancelEquipos}<span className="text-xs font-medium text-slate-400"> equipos</span></p><p className="text-[11px] text-slate-400 mt-0.5">{cancelClientes} cliente(s)</p></button>
+          <Kpi icon="truck" label={fEjec==="Todos"?"Pendientes por entregar":"Pend. entregar · "+fEjec} valor={pendEntregar} tono="text-orange-600"/>
           <Kpi icon="alarm" label="Llamadas por hacer" valor={porMarcar} tono={hayVencidas?"text-red-600":"text-slate-900"}/>
           <Kpi icon="clip" label="Expedientes por completar" valor={expIncompletos} tono="text-indigo-600"/>
           <Kpi icon="calendar" label="Entregas próx. 7 días" valor={entregas7} tono="text-emerald-600"/>
@@ -539,4 +576,3 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
-
