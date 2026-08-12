@@ -25,7 +25,7 @@ const { useState, useMemo, useEffect } = React;
 const API_URL = "https://script.google.com/macros/s/AKfycbztAVghizh_eVDXNY7eMcBzReaVdXQQwSmULoWIePfyI9iHxWOxoS_IwZ5yS5zixi6Y/exec";
 const API_TOKEN = "BETHY-2026";
 
-/* ---- CONTRASEÑASBETHY-2026 DE ACCESO (cámbialas cuando quieras) ---- */
+/* ---- CONTRASEÑAS DE ACCESO (cámbialas cuando quieras) ---- */
 const PASS_VER  = "1234";            // solo consultar
 const PASS_EDIT = "Jj_F0rza2026";    // consultar y editar
 const CLOUD = API_URL.length > 10;
@@ -256,6 +256,7 @@ function uniEq(r){return (r.equipos||[]).reduce((s,e)=>s+(e.tipo?(Number(e.canti
 function entregadosCli(r){if(r.entregaModo==="completa")return uniEq(r);if(r.entregaModo==="parcial")return (r.nivsEntrega||[]).filter(e=>e.entregado).length;return 0;}
 function faltanCli(r){return Math.max(0,uniEq(r)-entregadosCli(r));}
 function esParcial(r){return r.entregaModo==="parcial";}
+function equiposEntregados(r){if(r.entregaModo==="parcial"||r.entregaModo==="completa")return entregadosCli(r);return (r.estatuses||[]).includes("Entregado")?uniEq(r):0;}
 function App(){
   const [modo,setModo]=useState(null);
   const puedeEditar=modo==="edit";
@@ -301,7 +302,7 @@ function App(){
   const totalEquipos=porEjec.reduce((s,r)=>s+numEquipos(r),0);
   const entregados=porEjec.filter(r=>(r.estatuses||[]).includes("Entregado"));
   const entregClientes=entregados.length;
-  const entregEquipos=entregados.reduce((s,r)=>s+numEquipos(r),0);
+  const entregEquipos=porEjec.reduce((s,r)=>s+equiposEntregados(r),0);
   const cancelados=porEjec.filter(r=>(r.estatuses||[]).includes("Cancelado"));
   const cancelClientes=cancelados.length;
   const cancelEquipos=cancelados.reduce((s,r)=>s+numEquipos(r),0);
@@ -607,3 +608,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
+
