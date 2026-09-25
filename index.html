@@ -22,8 +22,8 @@ const { useState, useMemo, useEffect } = React;
    2) Pon EXACTAMENTE el mismo token en API_TOKEN
    Si las dejas vacías, la app funciona en modo local (sin nube).
    ============================================================ */
-const API_URL = "https://script.google.com/macros/s/AKfycbztAVghizh_eVDXNY7eMcBzReaVdXQQwSmULoWIePfyI9iHxWOxoS_IwZ5yS5zixi6Y/exec";
-const API_TOKEN = "BETHY-2026";
+const API_URL = "";
+const API_TOKEN = "";
 
 /* ---- CONTRASEÑAS DE ACCESO (cámbialas cuando quieras) ---- */
 const PASS_VER  = "1234";            // solo consultar
@@ -512,6 +512,7 @@ function Modal({inicial,fEjec,ejecutivos,cliPorEjec,onClose,onSave,puedeEditar})
   }
   function quitarArchivo(docKey,idx){if(!puedeEditar)return;if(!window.confirm("¿Quitar este archivo del expediente?\n(El archivo permanece en tu Google Drive.)"))return;setF(p=>{const arr=[...(((p.archivos||{})[docKey])||[])];arr.splice(idx,1);return{...p,archivos:{...(p.archivos||{}),[docKey]:arr}};});}
   const [nb,setNb]=useState({fecha:HOY,tipo:"Llamada",contacto:"Contestó",resultado:""});
+  const [editBitId,setEditBitId]=useState(null);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const toggleEst=est=>setF(p=>{const cur=p.estatuses||[];const has=cur.includes(est);const es=has?cur.filter(x=>x!==est):[...cur,est];return{...p,estatuses:es,estatus:principal(es)};});
   const setTC=v=>setF(p=>({...p,tipoCliente:v,requisitos:{...reqPend(v),...p.requisitos}}));
@@ -523,6 +524,7 @@ function Modal({inicial,fEjec,ejecutivos,cliPorEjec,onClose,onSave,puedeEditar})
   const toggleAdi=a=>setF(p=>({...p,adicionales:p.adicionales.includes(a)?p.adicionales.filter(x=>x!==a):[...p.adicionales,a]}));
   const addBit=()=>{if(!nb.resultado.trim()&&!nb.tipo)return;setF(p=>({...p,bitacora:[...p.bitacora,{id:Math.max(0,...p.bitacora.map(x=>x.id||0))+1,...nb,resultado:nb.resultado.trim()}]}));setNb({fecha:HOY,tipo:nb.tipo,contacto:"Contestó",resultado:""});};
   const delBit=id=>setF(p=>({...p,bitacora:p.bitacora.filter(x=>x.id!==id)}));
+  const editBit=(id,campo,val)=>setF(p=>({...p,bitacora:p.bitacora.map(x=>x.id===id?{...x,[campo]:val}:x)}));
 
   const clientesSug=cliPorEjec[f.ejecutivo]||[];
   const st=reqStats(f);const valido=f.cliente;const plazosDisp=PLAZOS[f.tipoVenta]||[];
@@ -596,7 +598,7 @@ function Modal({inicial,fEjec,ejecutivos,cliPorEjec,onClose,onSave,puedeEditar})
           <div className="grid grid-cols-2 gap-2 mb-2">{CONTACTO.map(op=>{const a=nb.contacto===op;const s=op==="Contestó"?(a?"bg-emerald-600 text-white border-emerald-600":"border-stone-300 text-slate-600 hover:bg-emerald-50"):(a?"bg-red-500 text-white border-red-500":"border-stone-300 text-slate-600 hover:bg-red-50");return <button key={op} onClick={()=>setNb({...nb,contacto:op})} className={`rounded-lg border px-2 py-2 text-sm font-medium ${s}`}>{op}</button>;})}</div>
           <textarea value={nb.resultado} onChange={e=>setNb({...nb,resultado:e.target.value})} rows={2} placeholder="¿Qué pasó en esta interacción? (resultado, qué se pidió, siguiente paso…)" className={inp}/>
           <button onClick={addBit} className="mt-2 inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"><Icon name="plus" size={13}/> Agregar a la bitácora</button>
-          {bitOrd.length>0 && (<div className="mt-3 space-y-1.5 border-t border-slate-200 pt-2">{bitOrd.map(be=>(<div key={be.id} className="flex items-start gap-2 rounded-md bg-white border border-stone-200 px-2 py-1.5 text-xs"><TipoTag tipo={be.tipo}/><div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><span className="font-semibold text-slate-600">{corto(be.fecha)}</span><ContactoTag contacto={be.contacto} compacto/></div>{be.resultado && <p className="text-slate-600">{be.resultado}</p>}</div><button onClick={()=>delBit(be.id)} className="text-slate-300 hover:text-red-500"><Icon name="x" size={13}/></button></div>))}</div>)}
+          {bitOrd.length>0 && (<div className="mt-3 space-y-1.5 border-t border-slate-200 pt-2">{bitOrd.map(be=>(<div key={be.id} className="flex items-start gap-2 rounded-md bg-white border border-stone-200 px-2 py-1.5 text-xs"><TipoTag tipo={be.tipo}/><div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><input type="date" value={be.fecha||""} onChange={e=>editBit(be.id,"fecha",e.target.value)} disabled={editBitId!==be.id} className={`font-semibold text-slate-600 bg-transparent outline-none ${editBitId===be.id?"border border-stone-300 rounded px-1":"border-0 pointer-events-none"}`}/><ContactoTag contacto={be.contacto} compacto/></div>{editBitId===be.id?<textarea value={be.resultado||""} onChange={e=>editBit(be.id,"resultado",e.target.value)} rows={2} className="mt-1 w-full rounded border border-amber-300 bg-white px-2 py-1 text-slate-700 outline-none focus:border-amber-400" placeholder="Escribe el comentario…"/>:(be.resultado && <p className="text-slate-600 whitespace-pre-wrap">{be.resultado}</p>)}</div>{editBitId===be.id?<button onClick={()=>setEditBitId(null)} title="Listo" className="text-emerald-500 hover:text-emerald-700"><Icon name="check" size={14}/></button>:<button onClick={()=>setEditBitId(be.id)} title="Editar" className="text-slate-300 hover:text-amber-600"><Icon name="pencil" size={13}/></button>}<button onClick={()=>{if(editBitId===be.id)setEditBitId(null);delBit(be.id);}} title="Eliminar" className="text-slate-300 hover:text-red-500"><Icon name="x" size={13}/></button></div>))}</div>)}
         </div>
 
         <Campo label="Estatus de la solicitud (marca todas las etapas que apliquen)"><div className="flex flex-wrap gap-1.5">{ESTATUS.map(est=>{const on=(f.estatuses||[]).includes(est);return <button key={est} onClick={()=>toggleEst(est)} className={`rounded-full border px-2.5 py-1 text-xs font-medium ${on?ESTATUS_COLOR[est].chip+" ring-2 ring-offset-1 ring-slate-300":"border-stone-300 text-slate-500 hover:bg-stone-50"}`}>{on?"✓ ":""}{est}</button>;})}</div><span className="mt-1.5 block text-[11px] text-slate-400">En el tablero y los conteos aparece según la etapa más avanzada marcada: <span className="font-semibold text-slate-600">{principal(f.estatuses||[])}</span></span></Campo>
